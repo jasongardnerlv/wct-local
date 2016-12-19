@@ -17,6 +17,8 @@ interface PluginOptions {
   seleniumArgs?: string[];
   skipSeleniumInstall?: boolean;
   browsers: string[];
+  skipSelenium: boolean;
+  seleniumPort: number;
 }
 
 /** WCT plugin that enables support for local browsers via Selenium. */
@@ -73,26 +75,26 @@ const plugin: wct.PluginInterface = (
     if (!eachCapabilities.length) {
       return;
     }
-
-    // Already have your own Selenium server running?
+    let port;
     if (pluginOptions.skipSelenium) {
       if (!pluginOptions.seleniumPort) {
-        return reject('When skipSelenium is true, you must specify a port via seleniumPort');
+        wct.emit('log:error', 'When skipSelenium is true, you must specify a port via seleniumPort');
+        return;
       }
       wct.emit('log:info', 'Using user-managed Selenium server on port', pluginOptions.seleniumPort);
-      return resolve();
-    }
+      port = pluginOptions.seleniumPort;
+    } else {
+      await new Promise((resolve, reject) => {
+        wct.emitHook('prepare:selenium', (e) => e ? reject(e) : resolve());
+      });
+      await selenium.checkSeleniumEnvironment();
 
-    await new Promise((resolve, reject) => {
-      wct.emitHook('prepare:selenium', (e) => e ? reject(e) : resolve());
-    });
-    await selenium.checkSeleniumEnvironment();
-
-    let start = selenium.installAndStartSeleniumServer;
-    if (pluginOptions.skipSeleniumInstall) {
-      start = selenium.startSeleniumServer;
+      let start = selenium.installAndStartSeleniumServer;
+      if (pluginOptions.skipSeleniumInstall) {
+        start = selenium.startSeleniumServer;
+      }
+      port = await start(wct, pluginOptions.seleniumArgs);
     }
-    const port = await start(wct, pluginOptions.seleniumArgs);
     updatePort(eachCapabilities, port);
   };
   wct.hook('prepare', function(done: (err?: any) => void) {
