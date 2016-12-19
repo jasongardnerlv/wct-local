@@ -73,6 +73,16 @@ const plugin: wct.PluginInterface = (
     if (!eachCapabilities.length) {
       return;
     }
+
+    // Already have your own Selenium server running?
+    if (pluginOptions.skipSelenium) {
+      if (!pluginOptions.seleniumPort) {
+        return reject('When skipSelenium is true, you must specify a port via seleniumPort');
+      }
+      wct.emit('log:info', 'Using user-managed Selenium server on port', pluginOptions.seleniumPort);
+      return resolve();
+    }
+
     await new Promise((resolve, reject) => {
       wct.emitHook('prepare:selenium', (e) => e ? reject(e) : resolve());
     });
